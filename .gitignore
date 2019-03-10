@@ -1,0 +1,7 @@
+/node_modules
+/build
+/peer-key
+/main-full-consensus
+/test-full-consensus
+/mecha-richy-data
+.vscode

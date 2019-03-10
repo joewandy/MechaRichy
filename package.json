@@ -1,0 +1,14 @@
+{
+  "name": "mecha-richy",
+  "version": "1.0.0",
+  "description": "MechaRichy is a reimplementation of the Counterparty protocol for the Web.",
+  "main": "src/index.js",
+  "author": "Joe Wandy",
+  "license": "MIT",
+  "dependencies": {
+    "@keyv/sqlite": "^2.0.0",
+    "@nimiq/core": "^1.4.3",
+    "@nimiq/jungle-db": "^0.9.18",
+    "minimist": "^1.2.0"
+  }
+}
