@@ -7,6 +7,14 @@ Mecha-Richy
 
 [Check out its burn address here!](https://nimiq.watch/#NQ05+MECH+AR0C+HY00+0000+0000+0000+0000+0000)
 
+Try it!
+-------
+```
+$ git clone https://github.com/joewandy/MechaRichy.git
+$ yarn
+$ node src/index.js
+```
+
 Features
 --------
 - [ ] New token (MECHA) by burning your NIM.
