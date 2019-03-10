@@ -57,10 +57,7 @@ db.createObjectStore(Constants.JDB_TX_STORE);
 async function handleConsensus() {
     Log.i(Constants.TAG, 'Consensus established');
     Log.i(Constants.TAG, `Current state: height=${$.blockchain.height}, totalWork=${$.blockchain.totalWork}, headHash=${$.blockchain.headHash}`);
-    const maxHeight = $.blockchain.height;
     const chainStore = $.blockchain._store;
-    let block = Nimiq.GenesisConfig.GENESIS_BLOCK;
-    let height = block.height;
 
     // TODO: deal with consensus lost and connected again.
     // below line will throw Error: Cannot create ObjectStore while connected
@@ -75,6 +72,9 @@ async function handleConsensus() {
     $.blockStore = blockStore;
 
     // push all blocks of interest to the database
+    let block = null;   
+    let height = Constants.INDEX_START_BLOCK;
+    const maxHeight = $.blockchain.height;
     for (;;) {
         block = await chainStore.getBlockAt(height, true);
         if (block === null) {
@@ -89,8 +89,10 @@ async function handleConsensus() {
             if (temp === undefined) {
                 await storeBlock(blockStore, block);
             } else {
-                Log.i(Constants.TAG, `Block ${height}, head ${maxHeight} already stored.`);    
+                Log.i(Constants.TAG, `Block ${height}, head ${maxHeight} already stored`);    
             }
+        } else if (height % 1000 === 0) {
+            Log.i(Constants.TAG, `Now at block ${height}, head ${maxHeight}`);    
         }
 
         // move on to the next block until done
@@ -111,7 +113,7 @@ async function handleHeadChanged(head) {
         if (valid) {
             Log.i(Constants.TAG, `Pushing block ${head.height} to StateEngine.`);
             await storeBlock($.blockStore, head);
-            const key = block.hash().toBase64();
+            const key = head.hash().toBase64();
             $.stateEngine.push(key);    
         }
     }
@@ -124,8 +126,11 @@ async function isValidBlock(block) {
         for (let i=0; i < txs.length; i++) {
             const tx  = txs[i];
             if (tx._format === Nimiq.Transaction.Format.EXTENDED) {
-                valid = true;
-                break;
+                const asciiData = Nimiq.BufferUtils.toAscii(tx.data);
+                if (asciiData.startsWith('MCRC_')) {
+                    valid = true;
+                    break;
+                }
             }
         }
     }
@@ -137,7 +142,7 @@ async function storeBlock(blockStore, block) {
     const key = block.hash().toBase64();
     await jtx.put(key, block);
     await jtx.commit();
-    Log.i(Constants.TAG, `Block ${block.height} stored.`);    
+    Log.i(Constants.TAG, `Block ${block.height} stored`);    
 }
 
 class BlockStoreCodec {
