@@ -15,8 +15,8 @@ class StateEngine {
      * @param {Objectstore} blockStore a block store instance
      */
   constructor(jdb, blockStore) {
-    this.blocks = {};
-    this.accountsBalance = {
+    this.blocks = {}; // key: height, value: block hash
+    this.accountsBalance = { // TODO: replace this with an AccountTree
       'MECHA': {},
     };
     this.state = Constants.STATE_ENGINE_INITIALIZED;
@@ -91,15 +91,21 @@ class StateEngine {
   async _parseBlock(block) {
     const parsed = [];
     const txs = block.body.transactions;
-    if (txs.length === 0) {
+    if (txs.length === 0) { // if no transaction returns empty list
       return parsed;
     }
+    // otherwise process each transaction
+    // first, we fetch the function to handle an opcode
+    const txHandlers = {};
+    txHandlers[Constants.OPCODE_BURN] = this._parseBurn;
+    txHandlers[Constants.OPCODE_ASSET_ISSUE] = this._parseAssetIssue;
     for (let i=0; i < txs.length; i++) {
       const tx = txs[i];
       if (tx._format === Nimiq.Transaction.Format.EXTENDED) {
-        const asciiData = Nimiq.BufferUtils.toAscii(tx.data);
-        if (asciiData.startsWith('MCRC_')) {
-          const results = await this._parseBurn(tx);
+        const opCode = await this._getOpCode(tx);
+        const txHandler = txHandlers[opCode];
+        const results = await txHandler(tx);
+        if (results !== null) {
           parsed.push(results);
         }
       }
@@ -108,32 +114,53 @@ class StateEngine {
   }
 
   /**
-   * Parses a NIM burn event from the transaction.
-   * @param {ExtendedTransaction} tx A Nimiq extended transaction
-   */
-  async _parseBurn(tx) {
+ * Gets the opCode embedded in transaction data, if any
+ * @param {ExtendedTransaction} tx The transaction to process
+ * @return {String} The embedded opCode, if any
+ */
+  async _getOpCode(tx) {
     const asciiData = Nimiq.BufferUtils.toAscii(tx.data);
-    if (asciiData === 'MCRC_01') {
-      const sender = await this._trimWhitespaces(
-          tx.sender.toUserFriendlyAddress());
-      const recipient = await this._trimWhitespaces(
-          tx.recipient.toUserFriendlyAddress());
-      const burnAddress = await this._trimWhitespaces(
-          Constants.MECHA_RICHY_BURN_ADDRESS);
-      if (recipient !== burnAddress) {
-        return null;
+    for (let i = 0; i < Constants.ALL_OPCODES.length; i++) {
+      const opCode = Constants.ALL_OPCODES[i];
+      if (asciiData.startsWith(opCode)) {
+        return opCode;
       }
-      // const value = Nimiq.Policy.lunasToCoins(tx.value);
-      const value = tx.value;
-      const results = {
-        type: 'BURN',
-        sender: sender,
-        recipient: recipient,
-        value: value,
-      };
-      return results;
     }
     return null;
+  }
+
+  /**
+   * Parses a NIM burn event from the transaction.
+   * @param {ExtendedTransaction} tx A Nimiq extended transaction
+   * @return {*} The parsed event
+   */
+  async _parseBurn(tx) {
+    const sender = await this._trimWhitespaces(
+        tx.sender.toUserFriendlyAddress());
+    const recipient = await this._trimWhitespaces(
+        tx.recipient.toUserFriendlyAddress());
+    const burnAddress = await this._trimWhitespaces(
+        Constants.MECHA_RICHY_BURN_ADDRESS);
+    // validate that NIM has been sent to the burn address
+    if (recipient !== burnAddress) {
+      return null;
+    }
+    const results = {
+      opCode: Constants.OPCODE_BURN,
+      sender: sender,
+      recipient: recipient,
+      value: tx.value,
+    };
+    return results;
+  }
+
+  /**
+   * Parses a token transfer event from the transaction.
+   * @param {ExtendedTransaction} tx A Nimiq extended transaction
+   * @return {*} The parsed event
+   */
+  async _parseAssetIssue(tx) {
+    // TODO: implement this
   }
 
   /**
