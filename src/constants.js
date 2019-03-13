@@ -20,21 +20,22 @@ exports.STATE_ENGINE_READY = 'READY';
 exports.DEFAULT_TOKEN = 'MECHA';
 
 // Inspired by https://counterparty.io/docs/protocol_specification/
-exports.OPCODE_BURN = 'MECHA_01';
-exports.OPCODE_ASSET_ISSUE = 'MECHA_02'; // create asset
-exports.OPCODE_ASSET_TRANSFER = 'MECHA_03'; // move asset
-exports.OPCODE_ASSET_DESTROY = 'MECHA_04'; // destroy asset
+exports.OPCODE_PREFIX = 'MCRC';
+exports.OPCODE_BURN = 'MCRC_01';
+exports.OPCODE_ASSET_ISSUE = 'MCRC_02'; // create asset
+exports.OPCODE_ASSET_TRANSFER = 'MCRC_03'; // move asset
+exports.OPCODE_ASSET_DESTROY = 'MCRC_04'; // destroy asset
 
 // dex functionalities
-exports.OPCODE_ASSET_ORDER = 'MECHA_05';
-exports.OPCODE_ASSET_CANCEL_ORDER = 'MECHA_06';
-exports.OPCODE_ASSET_LOCK = 'MECHA_07';
+exports.OPCODE_ASSET_ORDER = 'MCRC_05';
+exports.OPCODE_ASSET_CANCEL_ORDER = 'MCRC_06';
+exports.OPCODE_ASSET_LOCK = 'MCRC_07';
 
 // misc functionalities
-exports.OPCODE_MEMO = 'MECHA_08';
-exports.OPCODE_BROADCAST = 'MECHA_09';
-exports.OPCODE_BET = 'MECHA_10';
-exports.OPCODE_PAY_DIVIDEND = 'MECHA_11';
+exports.OPCODE_MEMO = 'MCRC_08';
+exports.OPCODE_BROADCAST = 'MCRC_09';
+exports.OPCODE_BET = 'MCRC_10';
+exports.OPCODE_PAY_DIVIDEND = 'MCRC_11';
 
 exports.ALL_OPCODES = [
   exports.OPCODE_BURN,

@@ -137,7 +137,7 @@ async function isValidBlock(block) {
       const tx = txs[i];
       if (tx._format === Nimiq.Transaction.Format.EXTENDED) {
         const asciiData = Nimiq.BufferUtils.toAscii(tx.data);
-        if (asciiData.startsWith('MCRC_')) {
+        if (asciiData.startsWith(Constants.OPCODE_PREFIX)) {
           valid = true;
           break;
         }

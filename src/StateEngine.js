@@ -16,9 +16,9 @@ class StateEngine {
      */
   constructor(jdb, blockStore) {
     this.blocks = {}; // key: height, value: block hash
-    this.accountsBalance = { // TODO: replace this with an AccountTree
-      'MECHA': {},
-    };
+    // TODO: replace this with an AccountTree
+    this.accountsBalance = {};
+    this.accountsBalance[Constants.DEFAULT_TOKEN] = {};
     this.state = Constants.STATE_ENGINE_INITIALIZED;
     this._jdb = jdb;
     this._blockStore = blockStore;
@@ -30,32 +30,43 @@ class StateEngine {
    * Parses the indexed blockchain and update states.
    */
   async parseDb() {
-    // process db block
+    // Process stored blocks after consensus has been reached
+    // TODO: we shouldn't need two passes to do this?
+    // 1. Sort the stored blocks by height.
     const keys = await this._blockStore.keys();
     for (const key of keys) {
       const block = await this._blockStore.get(key);
+      this.blocks[block.height] = block;
+    }
+    const heights = Object.keys(this.blocks);
+    heights.sort();
+    // 2. Now process the blocks in the right order
+    for (const height of heights) {
+      const block = this.blocks[height];
       await this.processBlock(block);
     }
-    // process new blocks inserted by head change event in the indexer
+    // 3. Process new blocks inserted by head change event in the indexer last
     for (const key of this._pending) {
       const block = await this._blockStore.get(key);
       await this.processBlock(block);
     }
-    // done!!
+    // 4. Done!!
     this.state = Constants.STATE_ENGINE_READY;
     Log.i(TAG, `State engine ${this.state} with ` +
         `${Object.keys(this.blocks).length} blocks`);
   }
 
   /**
-   * Pushes a block to be processed by the state engine
+   * Pushes a block to be processed by the state engine when head changes.
    * @param {Hash} key The hash of a block to be processed.
    * Must already by stored by the block store.
    */
   async push(key) {
     if (this.state === Constants.STATE_ENGINE_INITIALIZED) {
+      // wait in queue to be processed
       this._pending.push(key);
     } else if (this.state === Constants.STATE_ENGINE_READY) {
+      // immediately process the block
       const block = await this._blockStore.get(key);
       await this.processBlock(block);
     }
@@ -67,21 +78,7 @@ class StateEngine {
    */
   async processBlock(block) {
     Log.i(TAG, `Processing block ${block.height}`);
-    const height = block.height;
-    this.blocks[height] = block;
-
-    const parsed = await this._parseBlock(block);
-    if (parsed.length > 0) {
-      for (let i = 0; i < parsed.length; i++) {
-        const parsedCommand = parsed[i];
-        if (parsedCommand.type === 'BURN') {
-          const dict = this.accountsBalance['MECHA'];
-          const key = parsedCommand.sender;
-          const value = parsedCommand.value;
-          dict[key] = (dict[key] || 0) + value;
-        }
-      }
-    }
+    await this._parseBlock(block);
   }
 
   /**
@@ -97,20 +94,16 @@ class StateEngine {
     // otherwise process each transaction
     // first, we fetch the function to handle an opcode
     const txHandlers = {};
-    txHandlers[Constants.OPCODE_BURN] = this._parseBurn;
-    txHandlers[Constants.OPCODE_ASSET_ISSUE] = this._parseAssetIssue;
+    txHandlers[Constants.OPCODE_BURN] = this._parseBurn.bind(this);
+    txHandlers[Constants.OPCODE_ASSET_ISSUE] = this._parseAssetIssue.bind(this);
     for (let i=0; i < txs.length; i++) {
       const tx = txs[i];
-      if (tx._format === Nimiq.Transaction.Format.EXTENDED) {
-        const opCode = await this._getOpCode(tx);
+      const opCode = await this._getOpCode(tx);
+      if (opCode !== null) {
         const txHandler = txHandlers[opCode];
-        const results = await txHandler(tx);
-        if (results !== null) {
-          parsed.push(results);
-        }
+        await txHandler(tx);
       }
     }
-    return parsed;
   }
 
   /**
@@ -119,6 +112,9 @@ class StateEngine {
  * @return {String} The embedded opCode, if any
  */
   async _getOpCode(tx) {
+    if (tx._format !== Nimiq.Transaction.Format.EXTENDED) {
+      return null;
+    }
     const asciiData = Nimiq.BufferUtils.toAscii(tx.data);
     for (let i = 0; i < Constants.ALL_OPCODES.length; i++) {
       const opCode = Constants.ALL_OPCODES[i];
@@ -135,23 +131,21 @@ class StateEngine {
    * @return {*} The parsed event
    */
   async _parseBurn(tx) {
-    const sender = await this._trimWhitespaces(
-        tx.sender.toUserFriendlyAddress());
-    const recipient = await this._trimWhitespaces(
-        tx.recipient.toUserFriendlyAddress());
+    const senderAddr = tx.sender.toUserFriendlyAddress();
+    const recipientAddr = tx.recipient.toUserFriendlyAddress();
+    const sender = await this._trimWhitespaces(senderAddr);
+    const recipient = await this._trimWhitespaces(recipientAddr);
     const burnAddress = await this._trimWhitespaces(
         Constants.MECHA_RICHY_BURN_ADDRESS);
     // validate that NIM has been sent to the burn address
     if (recipient !== burnAddress) {
       return null;
     }
-    const results = {
-      opCode: Constants.OPCODE_BURN,
-      sender: sender,
-      recipient: recipient,
-      value: tx.value,
-    };
-    return results;
+    // adds the burn token to the account
+    const dict = this.accountsBalance[Constants.DEFAULT_TOKEN];
+    const value = tx.value;
+    dict[sender] = (dict[sender] || 0) + value;
+    Log.i(TAG, `${Constants.OPCODE_BURN}: ${sender} ${dict[sender]}`);
   }
 
   /**
