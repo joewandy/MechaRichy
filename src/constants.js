@@ -2,6 +2,7 @@
 exports.JDB_NAME = 'mecha-richy-data';
 exports.JDB_TX_STORE = 'Transaction';
 exports.JDB_BLOCK_STORE = 'Block';
+exports.JDB_WALLET_STORE = 'Wallet';
 exports.BLOCKS_CACHING_ENABLED = true;
 exports.BLOCKS_CACHE_SIZE = 0;
 exports.BLOCKS_RAW_CACHE_SIZE = 500;

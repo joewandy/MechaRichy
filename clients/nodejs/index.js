@@ -1,8 +1,8 @@
 const argv = require('minimist')(process.argv.slice(2));
 const Nimiq = require('@nimiq/core');
 const JDB = require('@nimiq/jungle-db');
-const Constants = require('./constants.js');
-const StateEngine = require('./StateEngine.js');
+const Constants = require('../../src/constants.js');
+const StateEngine = require('../../src/StateEngine.js');
 const Log = Nimiq.Log;
 Log.instance.level = 'info';
 const TAG = 'MechaRichy';
@@ -26,6 +26,8 @@ db.createObjectStore(Constants.JDB_TX_STORE);
   const networkConfig = new Nimiq.DumbNetworkConfig();
   $.consensus = await Nimiq.Consensus.full(networkConfig);
   $.blockchain = $.consensus.blockchain;
+  $.accounts = $.blockchain.accounts;
+  $.mempool = $.consensus.mempool;
   $.network = $.consensus.network;
 
   $.consensus.on('established', handleConsensus);
@@ -122,6 +124,8 @@ async function handleHeadChanged(head) {
       const key = head.hash().toBase64();
       $.stateEngine.push(key);
     }
+  } else if (head.height % 100 == 0) {
+    Log.i(TAG, `Now at block: ${head.height}`);
   }
 }
 
